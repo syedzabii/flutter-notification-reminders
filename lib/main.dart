@@ -42,6 +42,12 @@ class NotificationDemo extends StatefulWidget {
 
 class _NotificationDemoState extends State<NotificationDemo> {
   String _lastAction = 'No action taken yet';
+  TimeOfDay _selectedTime = TimeOfDay.now();
+
+  // Custom medicine reminder times
+  TimeOfDay _morningTime = const TimeOfDay(hour: 9, minute: 0);
+  TimeOfDay _afternoonTime = const TimeOfDay(hour: 14, minute: 0);
+  TimeOfDay _eveningTime = const TimeOfDay(hour: 20, minute: 0);
 
   @override
   void initState() {
@@ -116,26 +122,349 @@ class _NotificationDemoState extends State<NotificationDemo> {
                 child: const Text('Show Now'),
               ),
               const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: () async {
-                  await NotificationService.scheduleNotification(
-                    title: 'Medicine Reminder',
-                    body: 'Did you take your medicine?',
-                    duration: const Duration(seconds: 13),
-                    payload: 'scheduled_medicine_reminder',
-                    useCustomSound: true,
-                  );
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Notification scheduled in 13 seconds!'),
-                      duration: Duration(seconds: 1),
-                    ),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  minimumSize: const Size(200, 50),
+              // Time picker section
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Text('Schedule in 13s'),
+                child: Column(
+                  children: [
+                    Text(
+                      'Schedule Notification',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'Time: ${_selectedTime.format(context)}',
+                          style: Theme.of(context).textTheme.bodyLarge,
+                        ),
+                        const SizedBox(width: 16),
+                        ElevatedButton(
+                          onPressed: () async {
+                            final TimeOfDay? picked = await showTimePicker(
+                              context: context,
+                              initialTime: _selectedTime,
+                            );
+                            if (picked != null) {
+                              setState(() {
+                                _selectedTime = picked;
+                              });
+                            }
+                          },
+                          child: const Text('Pick Time'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: () async {
+                        // Calculate the scheduled time
+                        final now = DateTime.now();
+                        final scheduledTime = DateTime(
+                          now.year,
+                          now.month,
+                          now.day,
+                          _selectedTime.hour,
+                          _selectedTime.minute,
+                        );
+
+                        // If the time has already passed today, schedule for tomorrow
+                        DateTime finalScheduledTime = scheduledTime;
+                        if (scheduledTime.isBefore(now)) {
+                          finalScheduledTime = scheduledTime.add(
+                            const Duration(days: 1),
+                          );
+                        }
+
+                        await NotificationService.scheduleNotificationAtTime(
+                          title: 'Medicine Reminder',
+                          body: 'Did you take your medicine?',
+                          scheduledTime: finalScheduledTime,
+                          payload: 'scheduled_medicine_reminder',
+                          useCustomSound: true,
+                        );
+
+                        final timeString = _selectedTime.format(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Notification scheduled for $timeString!',
+                            ),
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size(200, 50),
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text('Schedule Notification'),
+                    ),
+                    const SizedBox(height: 12),
+                    ElevatedButton(
+                      onPressed: () async {
+                        await NotificationService.cancelScheduledNotification();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Scheduled notification cancelled!'),
+                            duration: Duration(seconds: 1),
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size(200, 50),
+                        backgroundColor: Colors.red,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text('Cancel Scheduled'),
+                    ),
+                    const SizedBox(height: 12),
+                    // Custom Medicine Reminders Section
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.purple.shade300),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Column(
+                        children: [
+                          Text(
+                            'Custom Medicine Reminders',
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(color: Colors.purple.shade700),
+                          ),
+                          const SizedBox(height: 16),
+                          // Morning Medicine Time
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  'Morning:',
+                                  style: Theme.of(context).textTheme.bodyMedium,
+                                ),
+                              ),
+                              Text(
+                                _morningTime.format(context),
+                                style: Theme.of(context).textTheme.bodyLarge,
+                              ),
+                              const SizedBox(width: 16),
+                              ElevatedButton(
+                                onPressed: () async {
+                                  final TimeOfDay? picked =
+                                      await showTimePicker(
+                                        context: context,
+                                        initialTime: _morningTime,
+                                      );
+                                  if (picked != null) {
+                                    setState(() {
+                                      _morningTime = picked;
+                                    });
+                                  }
+                                },
+                                child: const Text('Set'),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          // Afternoon Medicine Time
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  'Afternoon:',
+                                  style: Theme.of(context).textTheme.bodyMedium,
+                                ),
+                              ),
+                              Text(
+                                _afternoonTime.format(context),
+                                style: Theme.of(context).textTheme.bodyLarge,
+                              ),
+                              const SizedBox(width: 16),
+                              ElevatedButton(
+                                onPressed: () async {
+                                  final TimeOfDay? picked =
+                                      await showTimePicker(
+                                        context: context,
+                                        initialTime: _afternoonTime,
+                                      );
+                                  if (picked != null) {
+                                    setState(() {
+                                      _afternoonTime = picked;
+                                    });
+                                  }
+                                },
+                                child: const Text('Set'),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          // Evening Medicine Time
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  'Evening:',
+                                  style: Theme.of(context).textTheme.bodyMedium,
+                                ),
+                              ),
+                              Text(
+                                _eveningTime.format(context),
+                                style: Theme.of(context).textTheme.bodyLarge,
+                              ),
+                              const SizedBox(width: 16),
+                              ElevatedButton(
+                                onPressed: () async {
+                                  final TimeOfDay? picked =
+                                      await showTimePicker(
+                                        context: context,
+                                        initialTime: _eveningTime,
+                                      );
+                                  if (picked != null) {
+                                    setState(() {
+                                      _eveningTime = picked;
+                                    });
+                                  }
+                                },
+                                child: const Text('Set'),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: () async {
+                              // Schedule custom medicine reminders
+                              final now = DateTime.now();
+                              final notifications = [
+                                {
+                                  'title': 'Morning Medicine',
+                                  'body': 'Time for your morning medicine!',
+                                  'scheduledTime': DateTime(
+                                    now.year,
+                                    now.month,
+                                    now.day,
+                                    _morningTime.hour,
+                                    _morningTime.minute,
+                                  ),
+                                  'payload': 'morning_medicine',
+                                  'useCustomSound': true,
+                                },
+                                {
+                                  'title': 'Afternoon Medicine',
+                                  'body': 'Time for your afternoon medicine!',
+                                  'scheduledTime': DateTime(
+                                    now.year,
+                                    now.month,
+                                    now.day,
+                                    _afternoonTime.hour,
+                                    _afternoonTime.minute,
+                                  ),
+                                  'payload': 'afternoon_medicine',
+                                  'useCustomSound': true,
+                                },
+                                {
+                                  'title': 'Evening Medicine',
+                                  'body': 'Time for your evening medicine!',
+                                  'scheduledTime': DateTime(
+                                    now.year,
+                                    now.month,
+                                    now.day,
+                                    _eveningTime.hour,
+                                    _eveningTime.minute,
+                                  ),
+                                  'payload': 'evening_medicine',
+                                  'useCustomSound': true,
+                                },
+                              ];
+
+                              // Adjust times if they've already passed today
+                              for (var notification in notifications) {
+                                final scheduledTime =
+                                    notification['scheduledTime'] as DateTime;
+                                if (scheduledTime.isBefore(now)) {
+                                  notification['scheduledTime'] = scheduledTime
+                                      .add(const Duration(days: 1));
+                                }
+                              }
+
+                              await NotificationService.scheduleMultipleNotifications(
+                                notifications: notifications,
+                              );
+
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'Medicine reminders scheduled for ${_morningTime.format(context)}, ${_afternoonTime.format(context)}, and ${_eveningTime.format(context)}!',
+                                  ),
+                                  duration: const Duration(seconds: 3),
+                                ),
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              minimumSize: const Size(200, 50),
+                              backgroundColor: Colors.purple,
+                              foregroundColor: Colors.white,
+                            ),
+                            child: const Text('Schedule Custom Reminders'),
+                          ),
+                          const SizedBox(height: 8),
+                          TextButton(
+                            onPressed: () {
+                              setState(() {
+                                _morningTime = const TimeOfDay(
+                                  hour: 9,
+                                  minute: 0,
+                                );
+                                _afternoonTime = const TimeOfDay(
+                                  hour: 14,
+                                  minute: 0,
+                                );
+                                _eveningTime = const TimeOfDay(
+                                  hour: 20,
+                                  minute: 0,
+                                );
+                              });
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Times reset to default (9:00 AM, 2:00 PM, 8:00 PM)',
+                                  ),
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                            },
+                            child: const Text('Reset to Default Times'),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ElevatedButton(
+                      onPressed: () async {
+                        await NotificationService.cancelAllScheduledNotifications();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'All scheduled notifications cancelled!',
+                            ),
+                            duration: Duration(seconds: 1),
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size(200, 50),
+                        backgroundColor: Colors.orange,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text('Cancel All'),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),

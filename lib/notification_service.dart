@@ -18,6 +18,9 @@ class NotificationService {
   // A static callback that can be set from outside
   static NotificationActionCallback? onNotificationAction;
 
+  // Counter for generating unique notification IDs
+  static int _notificationIdCounter = 1000;
+
   static Future<void> initialize() async {
     try {
       // Android initialization
@@ -190,6 +193,111 @@ class NotificationService {
     }
   }
 
+  static Future<void> scheduleNotificationAtTime({
+    required String title,
+    required String body,
+    required DateTime scheduledTime,
+    String? payload,
+    bool useCustomSound = false,
+    int? notificationId,
+  }) async {
+    try {
+      if (Platform.isAndroid) {
+        // Request exact alarm permission for Android 14+
+        final bool? hasPermission =
+            await _notificationsPlugin
+                .resolvePlatformSpecificImplementation<
+                  AndroidFlutterLocalNotificationsPlugin
+                >()
+                ?.requestExactAlarmsPermission();
+
+        if (hasPermission != true) {
+          debugPrint('Exact alarm permission not granted');
+          return;
+        }
+      }
+
+      // Define action buttons
+      final List<AndroidNotificationAction> actions = [
+        AndroidNotificationAction(
+          skipActionId,
+          'Skip',
+          // Comment out or remove if you don't have these icons
+          // icon: DrawableResourceAndroidBitmap('ic_skip'),
+          showsUserInterface: true,
+        ),
+        AndroidNotificationAction(
+          takenActionId,
+          'Taken',
+          // Comment out or remove if you don't have these icons
+          // icon: DrawableResourceAndroidBitmap('ic_taken'),
+          showsUserInterface: true,
+        ),
+      ];
+
+      final AndroidNotificationDetails androidNotificationDetails;
+      if (useCustomSound) {
+        androidNotificationDetails = AndroidNotificationDetails(
+          'scheduled_channel_id_sound_2',
+          'Scheduled Notification channel with sound 2',
+          channelDescription: 'Time Scheduled Notifications with sound',
+          importance: Importance.max,
+          priority: Priority.high,
+          sound: const RawResourceAndroidNotificationSound(
+            'notification_sound2',
+          ),
+          playSound: true,
+          actions: actions,
+        );
+      } else {
+        androidNotificationDetails = AndroidNotificationDetails(
+          'scheduled_channel_id_2',
+          'Scheduled Notification channel 2',
+          channelDescription: 'Time Scheduled Notifications',
+          importance: Importance.max,
+          priority: Priority.high,
+          actions: actions,
+        );
+      }
+
+      // For iOS/macOS
+      const DarwinNotificationDetails darwinNotificationDetails =
+          DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
+            categoryIdentifier: 'medicine_category',
+          );
+
+      NotificationDetails notificationDetails = NotificationDetails(
+        android: androidNotificationDetails,
+        iOS: darwinNotificationDetails,
+        macOS: darwinNotificationDetails,
+      );
+
+      // Convert DateTime to TZDateTime
+      final tz.TZDateTime scheduledTZTime = tz.TZDateTime.from(
+        scheduledTime,
+        tz.local,
+      );
+
+      // Use provided ID or generate a unique one using counter
+      final int id = notificationId ?? _notificationIdCounter++;
+
+      await _notificationsPlugin.zonedSchedule(
+        id,
+        title,
+        body,
+        scheduledTZTime,
+        notificationDetails,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        payload: payload,
+      );
+    } catch (e) {
+      debugPrint('Error scheduling notification: $e');
+    }
+  }
+
   static Future<void> scheduleNotification({
     required String title,
     required String body,
@@ -283,5 +391,64 @@ class NotificationService {
     } catch (e) {
       debugPrint('Error scheduling notification: $e');
     }
+  }
+
+  static Future<void> cancelScheduledNotification() async {
+    try {
+      await _notificationsPlugin.cancel(1);
+      debugPrint('Scheduled notification cancelled');
+    } catch (e) {
+      debugPrint('Error cancelling notification: $e');
+    }
+  }
+
+  static Future<void> scheduleMultipleNotifications({
+    required List<Map<String, dynamic>> notifications,
+  }) async {
+    try {
+      for (int i = 0; i < notifications.length; i++) {
+        final notification = notifications[i];
+
+        // Generate unique ID for each notification BEFORE calling scheduleNotificationAtTime
+        final int uniqueId =
+            notification['notificationId'] ?? (_notificationIdCounter++);
+
+        await scheduleNotificationAtTime(
+          title: notification['title'] ?? 'Reminder',
+          body: notification['body'] ?? 'Time for your reminder!',
+          scheduledTime: notification['scheduledTime'],
+          payload: notification['payload'],
+          useCustomSound: notification['useCustomSound'] ?? false,
+          notificationId: uniqueId, // Use the pre-generated unique ID
+        );
+
+        debugPrint('Scheduled notification with ID: $uniqueId');
+      }
+      debugPrint(
+        '${notifications.length} notifications scheduled successfully',
+      );
+    } catch (e) {
+      debugPrint('Error scheduling multiple notifications: $e');
+    }
+  }
+
+  static Future<void> cancelAllScheduledNotifications() async {
+    try {
+      await _notificationsPlugin.cancelAll();
+      debugPrint('All scheduled notifications cancelled');
+    } catch (e) {
+      debugPrint('Error cancelling all notifications: $e');
+    }
+  }
+
+  // Reset the notification ID counter (useful for testing or if you need to start fresh)
+  static void resetNotificationIdCounter() {
+    _notificationIdCounter = 1000;
+    debugPrint('Notification ID counter reset to 1000');
+  }
+
+  // Get the current notification ID counter value
+  static int getCurrentNotificationId() {
+    return _notificationIdCounter;
   }
 }
