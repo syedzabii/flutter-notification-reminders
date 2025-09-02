@@ -1,0 +1,21 @@
+Hi,
+
+We have problem with dependencies especially notifications.
+
+So here is what is important, 
+
+always check pub.dev, they Specify what sdkVersion is required for the package.
+
+for example, flutter_local_notifications: ^19.1.0 requires timezone: ^0.10.0
+
+so we need to add timezone: ^0.10.0 in pubspec.yaml.
+
+also ndkVersion it has been changed to 27.0.12077973 in build.gradle.kts.
+
+
+we have added, battery optimization helper to check if the app is allowed to run in the background.
+it works!
+
+we have launchapp notifications, to redirect to app when notification is clicked.
+it works!
+
