@@ -55,10 +55,6 @@ class _NotificationDemoState extends State<NotificationDemo> {
 
     // Set up a callback to receive notification actions
     NotificationService.onNotificationAction = _onNotificationAction;
-    // Check and prompt for battery optimization settings
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      BatteryOptimizationHelper.checkAndPrompt(context);
-    });
   }
 
   void _onNotificationAction(String actionId, String? payload) {
