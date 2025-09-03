@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'battery_optimization_helper.dart';
 import 'notification_service.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
@@ -42,11 +43,10 @@ class NotificationDemo extends StatefulWidget {
 class _NotificationDemoState extends State<NotificationDemo> {
   String _lastAction = 'No action taken yet';
   TimeOfDay _selectedTime = TimeOfDay.now();
-  bool _hasNotificationPermission = false;
 
   // Custom medicine reminder times
-  TimeOfDay _morningTime = const TimeOfDay(hour: 6, minute: 45);
-  TimeOfDay _afternoonTime = const TimeOfDay(hour: 7, minute: 0);
+  TimeOfDay _morningTime = const TimeOfDay(hour: 9, minute: 0);
+  TimeOfDay _afternoonTime = const TimeOfDay(hour: 14, minute: 0);
   TimeOfDay _eveningTime = const TimeOfDay(hour: 20, minute: 0);
 
   @override
@@ -55,15 +55,9 @@ class _NotificationDemoState extends State<NotificationDemo> {
 
     // Set up a callback to receive notification actions
     NotificationService.onNotificationAction = _onNotificationAction;
-    // Check notification permissions
-    _checkNotificationPermissions();
-  }
-
-  Future<void> _checkNotificationPermissions() async {
-    final bool hasPermission =
-        await NotificationService.requestNotificationPermissions();
-    setState(() {
-      _hasNotificationPermission = hasPermission;
+    // Check and prompt for battery optimization settings
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      BatteryOptimizationHelper.checkAndPrompt(context);
     });
   }
 
@@ -106,36 +100,7 @@ class _NotificationDemoState extends State<NotificationDemo> {
                 style: Theme.of(context).textTheme.titleLarge,
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 20),
-              // Permission status
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    _hasNotificationPermission
-                        ? Icons.notifications_active
-                        : Icons.notifications_off,
-                    color:
-                        _hasNotificationPermission ? Colors.green : Colors.red,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    _hasNotificationPermission
-                        ? 'Notifications Enabled'
-                        : 'Notifications Disabled',
-                    style: TextStyle(
-                      color:
-                          _hasNotificationPermission
-                              ? Colors.green
-                              : Colors.red,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 20),
+              const SizedBox(height: 40),
               ElevatedButton(
                 onPressed: () async {
                   await NotificationService.showNotification(

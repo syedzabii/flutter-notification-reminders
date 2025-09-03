@@ -570,18 +570,12 @@ class NotificationService {
     required List<Map<String, dynamic>> dailyNotifications,
   }) async {
     try {
-      // Cancel any existing daily notifications first
-      await _cancelAllDailyNotifications();
-
       for (int i = 0; i < dailyNotifications.length; i++) {
         final notification = dailyNotifications[i];
 
-        // Generate unique ID for each daily notification using time + index
-        // More robust unique ID generation
-        final TimeOfDay time = notification['time'];
-        final int baseId = 1000 + (i * 1000); // Use i*1000 for more separation
-        final int timeBasedOffset = (time.hour * 60) + time.minute;
-        final int uniqueId = baseId + timeBasedOffset;
+        // Generate unique ID for each daily notification
+        final int uniqueId =
+            notification['notificationId'] ?? (_notificationIdCounter++);
 
         await scheduleDailyNotification(
           title: notification['title'] ?? 'Daily Reminder',
@@ -592,31 +586,13 @@ class NotificationService {
           notificationId: uniqueId,
         );
 
-        debugPrint(
-          'Daily notification scheduled with ID: $uniqueId for time: ${notification['time'].format(null)}',
-        );
-
-        // Add small delay to avoid conflicts
-        await Future.delayed(const Duration(milliseconds: 100));
+        debugPrint('Daily notification scheduled with ID: $uniqueId');
       }
       debugPrint(
         '${dailyNotifications.length} daily notifications scheduled successfully',
       );
     } catch (e) {
       debugPrint('Error scheduling multiple daily notifications: $e');
-    }
-  }
-
-  // Helper method to cancel only daily notifications
-  static Future<void> _cancelAllDailyNotifications() async {
-    try {
-      // Cancel notifications with IDs in the daily range (1000-9999)
-      for (int id = 1000; id < 10000; id += 100) {
-        await _notificationsPlugin.cancel(id);
-      }
-      debugPrint('All daily notifications cancelled');
-    } catch (e) {
-      debugPrint('Error cancelling daily notifications: $e');
     }
   }
 
