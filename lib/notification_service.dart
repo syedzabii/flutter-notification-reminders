@@ -544,16 +544,11 @@ class NotificationService {
       // Use provided ID or generate a unique one
       final int id = notificationId ?? _notificationIdCounter++;
 
-      // Format the time for display
-      final String timeString =
-          '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
-      final String bodyWithTime = '$body (Scheduled for $timeString)';
-
       // Schedule with daily recurrence
       await _notificationsPlugin.zonedSchedule(
         id,
         title,
-        bodyWithTime,
+        body,
         scheduledTZTime,
         notificationDetails,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
@@ -578,17 +573,10 @@ class NotificationService {
       for (int i = 0; i < dailyNotifications.length; i++) {
         final notification = dailyNotifications[i];
 
-        // Format the time for display
-        final TimeOfDay time = notification['time'];
-        final String timeString =
-            '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
-        final String bodyWithTime =
-            '${notification['body'] ?? 'Time for your daily reminder!'} (Scheduled for $timeString)';
-
         await scheduleDailyNotification(
           title: notification['title'] ?? 'Daily Reminder',
-          body: bodyWithTime,
-          time: time,
+          body: notification['body'] ?? 'Time for your daily reminder!',
+          time: notification['time'],
           payload: notification['payload'],
           useCustomSound: notification['useCustomSound'] ?? false,
         );
