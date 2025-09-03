@@ -544,11 +544,16 @@ class NotificationService {
       // Use provided ID or generate a unique one
       final int id = notificationId ?? _notificationIdCounter++;
 
+      // Format the time for display
+      final String timeString =
+          '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+      final String bodyWithTime = '$body (Scheduled for $timeString)';
+
       // Schedule with daily recurrence
       await _notificationsPlugin.zonedSchedule(
         id,
         title,
-        body,
+        bodyWithTime,
         scheduledTZTime,
         notificationDetails,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
@@ -573,37 +578,31 @@ class NotificationService {
       for (int i = 0; i < dailyNotifications.length; i++) {
         final notification = dailyNotifications[i];
 
-        // Generate unique ID for each daily notification
-        final int uniqueId =
-            notification['notificationId'] ?? (_notificationIdCounter++);
+        // Format the time for display
+        final TimeOfDay time = notification['time'];
+        final String timeString =
+            '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+        final String bodyWithTime =
+            '${notification['body'] ?? 'Time for your daily reminder!'} (Scheduled for $timeString)';
 
         await scheduleDailyNotification(
           title: notification['title'] ?? 'Daily Reminder',
-          body: notification['body'] ?? 'Time for your daily reminder!',
-          time: notification['time'],
+          body: bodyWithTime,
+          time: time,
           payload: notification['payload'],
           useCustomSound: notification['useCustomSound'] ?? false,
-          notificationId: uniqueId,
         );
 
-        debugPrint('Daily notification scheduled with ID: $uniqueId');
+        debugPrint(
+          'Daily notification scheduled for time: ${notification['time']}',
+        );
       }
+
       debugPrint(
         '${dailyNotifications.length} daily notifications scheduled successfully',
       );
     } catch (e) {
       debugPrint('Error scheduling multiple daily notifications: $e');
     }
-  }
-
-  // Reset the notification ID counter (useful for testing or if you need to start fresh)
-  static void resetNotificationIdCounter() {
-    _notificationIdCounter = 1000;
-    debugPrint('Notification ID counter reset to 1000');
-  }
-
-  // Get the current notification ID counter value
-  static int getCurrentNotificationId() {
-    return _notificationIdCounter;
   }
 }
