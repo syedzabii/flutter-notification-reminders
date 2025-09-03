@@ -441,6 +441,185 @@ class NotificationService {
     }
   }
 
+  // NEW METHOD: Schedule daily recurring notifications
+  static Future<void> scheduleDailyNotification({
+    required String title,
+    required String body,
+    required TimeOfDay time,
+    String? payload,
+    bool useCustomSound = false,
+    int? notificationId,
+  }) async {
+    try {
+      if (Platform.isAndroid) {
+        // Request exact alarm permission for Android 14+
+        final bool? hasPermission =
+            await _notificationsPlugin
+                .resolvePlatformSpecificImplementation<
+                  AndroidFlutterLocalNotificationsPlugin
+                >()
+                ?.requestExactAlarmsPermission();
+
+        if (hasPermission != true) {
+          debugPrint('Exact alarm permission not granted');
+          return;
+        }
+      }
+
+      // Define action buttons
+      final List<AndroidNotificationAction> actions = [
+        AndroidNotificationAction(
+          skipActionId,
+          'Skip',
+          showsUserInterface: true,
+        ),
+        AndroidNotificationAction(
+          takenActionId,
+          'Taken',
+          showsUserInterface: true,
+        ),
+      ];
+
+      final AndroidNotificationDetails androidNotificationDetails;
+      if (useCustomSound) {
+        androidNotificationDetails = AndroidNotificationDetails(
+          'daily_channel_id_sound',
+          'Daily Notification channel with sound',
+          channelDescription: 'Daily recurring notifications with sound',
+          importance: Importance.max,
+          priority: Priority.high,
+          sound: const RawResourceAndroidNotificationSound(
+            'notification_sound2',
+          ),
+          playSound: true,
+          actions: actions,
+        );
+      } else {
+        androidNotificationDetails = AndroidNotificationDetails(
+          'daily_channel_id',
+          'Daily Notification channel',
+          channelDescription: 'Daily recurring notifications',
+          importance: Importance.max,
+          priority: Priority.high,
+          actions: actions,
+        );
+      }
+
+      // For iOS/macOS
+      const DarwinNotificationDetails darwinNotificationDetails =
+          DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
+            categoryIdentifier: 'medicine_category',
+          );
+
+      NotificationDetails notificationDetails = NotificationDetails(
+        android: androidNotificationDetails,
+        iOS: darwinNotificationDetails,
+        macOS: darwinNotificationDetails,
+      );
+
+      // Calculate next occurrence of this time
+      final now = DateTime.now();
+      DateTime scheduledTime = DateTime(
+        now.year,
+        now.month,
+        now.day,
+        time.hour,
+        time.minute,
+      );
+
+      // If time has already passed today, schedule for tomorrow
+      if (scheduledTime.isBefore(now)) {
+        scheduledTime = scheduledTime.add(const Duration(days: 1));
+      }
+
+      // Convert to TZDateTime
+      final tz.TZDateTime scheduledTZTime = tz.TZDateTime.from(
+        scheduledTime,
+        tz.local,
+      );
+
+      // Use provided ID or generate a unique one
+      final int id = notificationId ?? _notificationIdCounter++;
+
+      // Schedule with daily recurrence
+      await _notificationsPlugin.zonedSchedule(
+        id,
+        title,
+        body,
+        scheduledTZTime,
+        notificationDetails,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        payload: payload,
+        matchDateTimeComponents:
+            DateTimeComponents.time, // This makes it repeat daily!
+      );
+
+      debugPrint(
+        'Daily notification scheduled for ${time.hour}:${time.minute.toString().padLeft(2, '0')} with ID: $id',
+      );
+    } catch (e) {
+      debugPrint('Error scheduling daily notification: $e');
+    }
+  }
+
+  // Schedule multiple daily recurring notifications
+  static Future<void> scheduleMultipleDailyNotifications({
+    required List<Map<String, dynamic>> dailyNotifications,
+  }) async {
+    try {
+      // Cancel any existing daily notifications first
+      await _cancelAllDailyNotifications();
+
+      for (int i = 0; i < dailyNotifications.length; i++) {
+        final notification = dailyNotifications[i];
+
+        // Generate unique ID for each daily notification using time + index
+        // More robust unique ID generation
+        final TimeOfDay time = notification['time'];
+        final int baseId = 1000 + (i * 1000); // Use i*1000 for more separation
+        final int timeBasedOffset = (time.hour * 60) + time.minute;
+        final int uniqueId = baseId + timeBasedOffset;
+
+        await scheduleDailyNotification(
+          title: notification['title'] ?? 'Daily Reminder',
+          body: notification['body'] ?? 'Time for your daily reminder!',
+          time: notification['time'],
+          payload: notification['payload'],
+          useCustomSound: notification['useCustomSound'] ?? false,
+          notificationId: uniqueId,
+        );
+
+        debugPrint(
+          'Daily notification scheduled with ID: $uniqueId for time: ${notification['time'].format(null)}',
+        );
+
+        // Add small delay to avoid conflicts
+        await Future.delayed(const Duration(milliseconds: 100));
+      }
+      debugPrint(
+        '${dailyNotifications.length} daily notifications scheduled successfully',
+      );
+    } catch (e) {
+      debugPrint('Error scheduling multiple daily notifications: $e');
+    }
+  }
+
+  // Helper method to cancel only daily notifications
+  static Future<void> _cancelAllDailyNotifications() async {
+    try {
+      // Cancel notifications with IDs in the daily range (1000-9999)
+      for (int id = 1000; id < 10000; id += 100) {
+        await _notificationsPlugin.cancel(id);
+      }
+      debugPrint('All daily notifications cancelled');
+    } catch (e) {
+      debugPrint('Error cancelling daily notifications: $e');
+    }
+  }
+
   // Reset the notification ID counter (useful for testing or if you need to start fresh)
   static void resetNotificationIdCounter() {
     _notificationIdCounter = 1000;

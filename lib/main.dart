@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'battery_optimization_helper.dart';
 import 'notification_service.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
@@ -43,10 +42,11 @@ class NotificationDemo extends StatefulWidget {
 class _NotificationDemoState extends State<NotificationDemo> {
   String _lastAction = 'No action taken yet';
   TimeOfDay _selectedTime = TimeOfDay.now();
+  bool _hasNotificationPermission = false;
 
   // Custom medicine reminder times
-  TimeOfDay _morningTime = const TimeOfDay(hour: 9, minute: 0);
-  TimeOfDay _afternoonTime = const TimeOfDay(hour: 14, minute: 0);
+  TimeOfDay _morningTime = const TimeOfDay(hour: 6, minute: 45);
+  TimeOfDay _afternoonTime = const TimeOfDay(hour: 7, minute: 0);
   TimeOfDay _eveningTime = const TimeOfDay(hour: 20, minute: 0);
 
   @override
@@ -55,9 +55,15 @@ class _NotificationDemoState extends State<NotificationDemo> {
 
     // Set up a callback to receive notification actions
     NotificationService.onNotificationAction = _onNotificationAction;
-    // Check and prompt for battery optimization settings
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      BatteryOptimizationHelper.checkAndPrompt(context);
+    // Check notification permissions
+    _checkNotificationPermissions();
+  }
+
+  Future<void> _checkNotificationPermissions() async {
+    final bool hasPermission =
+        await NotificationService.requestNotificationPermissions();
+    setState(() {
+      _hasNotificationPermission = hasPermission;
     });
   }
 
@@ -100,7 +106,36 @@ class _NotificationDemoState extends State<NotificationDemo> {
                 style: Theme.of(context).textTheme.titleLarge,
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 20),
+              // Permission status
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    _hasNotificationPermission
+                        ? Icons.notifications_active
+                        : Icons.notifications_off,
+                    color:
+                        _hasNotificationPermission ? Colors.green : Colors.red,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    _hasNotificationPermission
+                        ? 'Notifications Enabled'
+                        : 'Notifications Disabled',
+                    style: TextStyle(
+                      color:
+                          _hasNotificationPermission
+                              ? Colors.green
+                              : Colors.red,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: () async {
                   await NotificationService.showNotification(
@@ -439,6 +474,79 @@ class _NotificationDemoState extends State<NotificationDemo> {
                               );
                             },
                             child: const Text('Reset to Default Times'),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    // Daily Recurring Notifications Button
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.green.shade300),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Column(
+                        children: [
+                          Text(
+                            'Daily Recurring Notifications',
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(color: Colors.green.shade700),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'These will repeat EVERY DAY at your set times',
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: Colors.grey.shade600),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: () async {
+                              // Schedule daily recurring notifications
+                              final dailyNotifications = [
+                                {
+                                  'title': 'Morning Medicine',
+                                  'body': 'Time for your morning medicine!',
+                                  'time': _morningTime,
+                                  'payload': 'daily_morning_medicine',
+                                  'useCustomSound': true,
+                                },
+                                {
+                                  'title': 'Afternoon Medicine',
+                                  'body': 'Time for your afternoon medicine!',
+                                  'time': _afternoonTime,
+                                  'payload': 'daily_afternoon_medicine',
+                                  'useCustomSound': true,
+                                },
+                                {
+                                  'title': 'Evening Medicine',
+                                  'body': 'Time for your evening medicine!',
+                                  'time': _eveningTime,
+                                  'payload': 'daily_evening_medicine',
+                                  'useCustomSound': true,
+                                },
+                              ];
+
+                              await NotificationService.scheduleMultipleDailyNotifications(
+                                dailyNotifications: dailyNotifications,
+                              );
+
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'Daily recurring reminders set for ${_morningTime.format(context)}, ${_afternoonTime.format(context)}, and ${_eveningTime.format(context)}!',
+                                  ),
+                                  duration: const Duration(seconds: 3),
+                                ),
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              minimumSize: const Size(200, 50),
+                              backgroundColor: Colors.green,
+                              foregroundColor: Colors.white,
+                            ),
+                            child: const Text('Set Daily Recurring'),
                           ),
                         ],
                       ),
