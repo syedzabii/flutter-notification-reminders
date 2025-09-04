@@ -1,15 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
-import 'dart:io' show Platform;
-
-// Define action IDs as constants
-const String skipActionId = 'SKIP_ACTION';
-const String takenActionId = 'TAKEN_ACTION';
-
-// Define a callback type for handling actions
-typedef NotificationActionCallback =
-    void Function(String actionId, String? payload);
+import 'notification_helpers.dart';
 
 class NotificationService {
   static final FlutterLocalNotificationsPlugin _notificationsPlugin =
@@ -17,9 +9,6 @@ class NotificationService {
 
   // A static callback that can be set from outside
   static NotificationActionCallback? onNotificationAction;
-
-  // Counter for generating unique notification IDs
-  static int _notificationIdCounter = 1000;
 
   static Future<void> initialize() async {
     try {
@@ -46,7 +35,10 @@ class NotificationService {
       await _notificationsPlugin.initialize(
         initializationSettings,
         onDidReceiveNotificationResponse: (NotificationResponse response) {
-          _handleNotificationAction(response);
+          NotificationHelpers.handleNotificationAction(
+            response,
+            onNotificationAction,
+          );
         },
       );
 
@@ -56,7 +48,10 @@ class NotificationService {
       if (launchDetails != null &&
           launchDetails.notificationResponse != null &&
           launchDetails.didNotificationLaunchApp) {
-        _handleNotificationAction(launchDetails.notificationResponse!);
+        NotificationHelpers.handleNotificationAction(
+          launchDetails.notificationResponse!,
+          onNotificationAction,
+        );
       }
     } catch (e) {
       debugPrint('Notification initialization error: $e');
@@ -64,53 +59,9 @@ class NotificationService {
   }
 
   static Future<bool> requestNotificationPermissions() async {
-    if (Platform.isAndroid) {
-      final AndroidFlutterLocalNotificationsPlugin? androidPlugin =
-          _notificationsPlugin
-              .resolvePlatformSpecificImplementation<
-                AndroidFlutterLocalNotificationsPlugin
-              >();
-
-      // Request notification permission (Android 13+)
-      final bool? notificationAllowed =
-          await androidPlugin?.requestNotificationsPermission();
-
-      // Request exact alarm permission (Android 14+)
-      final bool? exactAlarmAllowed =
-          await androidPlugin?.requestExactAlarmsPermission();
-
-      return notificationAllowed == true && exactAlarmAllowed == true;
-    }
-    return true;
-  }
-
-  // Handler for notification actions
-  static void _handleNotificationAction(NotificationResponse response) {
-    final actionId = response.actionId;
-    final payload = response.payload;
-
-    debugPrint('Notification action received: $actionId, payload: $payload');
-
-    // Check which action was pressed
-    switch (actionId) {
-      case skipActionId:
-        debugPrint('Notification SKIPPED!');
-        // Add your skip logic here
-        break;
-      case takenActionId:
-        debugPrint('Notification TAKEN!');
-        // Add your taken logic here
-        break;
-      default:
-        debugPrint('Notification tapped (no specific action)');
-        // This handles the default tap on the notification body
-        break;
-    }
-
-    // Call the external callback if it's set
-    if (onNotificationAction != null) {
-      onNotificationAction!(actionId ?? '', payload);
-    }
+    return await NotificationHelpers.requestAndroidPermissions(
+      _notificationsPlugin,
+    );
   }
 
   static Future<void> showNotification({
@@ -124,68 +75,25 @@ class NotificationService {
       final bool hasPermission = await requestNotificationPermissions();
       if (!hasPermission) return;
 
-      // Define action buttons
-      final List<AndroidNotificationAction> actions = [
-        AndroidNotificationAction(
-          skipActionId,
-          'Skip',
-          // Comment out or remove if you don't have these icons
-          // icon: DrawableResourceAndroidBitmap('ic_skip'),
-          showsUserInterface: true,
-        ),
-        AndroidNotificationAction(
-          takenActionId,
-          'Taken',
-          // Comment out or remove if you don't have these icons
-          // icon: DrawableResourceAndroidBitmap('ic_taken'),
-          showsUserInterface: true,
-        ),
-      ];
-
-      final AndroidNotificationDetails androidNotificationDetails;
-      if (useCustomSound) {
-        androidNotificationDetails = AndroidNotificationDetails(
-          'channel_id_custom_sound',
-          'Immediate Notification channel with sound',
-          channelDescription: 'Testing Channel Description with sound',
-          importance: Importance.max,
-          priority: Priority.high,
-          sound: const RawResourceAndroidNotificationSound(
-            'notification_sound',
-          ),
-          playSound: true,
-          actions: actions,
-        );
-      } else {
-        androidNotificationDetails = AndroidNotificationDetails(
-          'channel_id',
-          'Immediate Notification channel',
-          channelDescription: 'Testing Channel Description',
-          importance: Importance.max,
-          priority: Priority.high,
-          actions: actions,
-        );
-      }
-
-      // For iOS/macOS
-      const DarwinNotificationDetails darwinNotificationDetails =
-          DarwinNotificationDetails(
-            presentAlert: true,
-            presentBadge: true,
-            presentSound: true,
-            // For iOS, you would need to set up categories in AppDelegate
-            categoryIdentifier: 'medicine_category',
-          );
+      final notificationDetails = NotificationHelpers.createNotificationDetails(
+        channelId: useCustomSound ? 'channel_id_custom_sound' : 'channel_id',
+        channelName:
+            useCustomSound
+                ? 'Immediate Notification channel with sound'
+                : 'Immediate Notification channel',
+        channelDescription:
+            useCustomSound
+                ? 'Testing Channel Description with sound'
+                : 'Testing Channel Description',
+        useCustomSound: useCustomSound,
+        soundResource: useCustomSound ? 'notification_sound' : null,
+      );
 
       await _notificationsPlugin.show(
         0,
         title,
         body,
-        NotificationDetails(
-          android: androidNotificationDetails,
-          iOS: darwinNotificationDetails,
-          macOS: darwinNotificationDetails,
-        ),
+        notificationDetails,
         payload: payload,
       );
     } catch (e) {
@@ -202,87 +110,39 @@ class NotificationService {
     int? notificationId,
   }) async {
     try {
-      if (Platform.isAndroid) {
-        // Request exact alarm permission for Android 14+
-        final bool? hasPermission =
-            await _notificationsPlugin
-                .resolvePlatformSpecificImplementation<
-                  AndroidFlutterLocalNotificationsPlugin
-                >()
-                ?.requestExactAlarmsPermission();
-
-        if (hasPermission != true) {
-          debugPrint('Exact alarm permission not granted');
-          return;
-        }
-      }
-
-      // Define action buttons
-      final List<AndroidNotificationAction> actions = [
-        AndroidNotificationAction(
-          skipActionId,
-          'Skip',
-          // Comment out or remove if you don't have these icons
-          // icon: DrawableResourceAndroidBitmap('ic_skip'),
-          showsUserInterface: true,
-        ),
-        AndroidNotificationAction(
-          takenActionId,
-          'Taken',
-          // Comment out or remove if you don't have these icons
-          // icon: DrawableResourceAndroidBitmap('ic_taken'),
-          showsUserInterface: true,
-        ),
-      ];
-
-      final AndroidNotificationDetails androidNotificationDetails;
-      if (useCustomSound) {
-        androidNotificationDetails = AndroidNotificationDetails(
-          'scheduled_channel_id_sound_2',
-          'Scheduled Notification channel with sound 2',
-          channelDescription: 'Time Scheduled Notifications with sound',
-          importance: Importance.max,
-          priority: Priority.high,
-          sound: const RawResourceAndroidNotificationSound(
-            'notification_sound2',
-          ),
-          playSound: true,
-          actions: actions,
-        );
-      } else {
-        androidNotificationDetails = AndroidNotificationDetails(
-          'scheduled_channel_id_2',
-          'Scheduled Notification channel 2',
-          channelDescription: 'Time Scheduled Notifications',
-          importance: Importance.max,
-          priority: Priority.high,
-          actions: actions,
-        );
-      }
-
-      // For iOS/macOS
-      const DarwinNotificationDetails darwinNotificationDetails =
-          DarwinNotificationDetails(
-            presentAlert: true,
-            presentBadge: true,
-            presentSound: true,
-            categoryIdentifier: 'medicine_category',
+      final bool hasPermission =
+          await NotificationHelpers.requestExactAlarmPermission(
+            _notificationsPlugin,
           );
+      if (!hasPermission) {
+        debugPrint('Exact alarm permission not granted');
+        return;
+      }
 
-      NotificationDetails notificationDetails = NotificationDetails(
-        android: androidNotificationDetails,
-        iOS: darwinNotificationDetails,
-        macOS: darwinNotificationDetails,
+      final notificationDetails = NotificationHelpers.createNotificationDetails(
+        channelId:
+            useCustomSound
+                ? 'scheduled_channel_id_sound_2'
+                : 'scheduled_channel_id_2',
+        channelName:
+            useCustomSound
+                ? 'Scheduled Notification channel with sound 2'
+                : 'Scheduled Notification channel 2',
+        channelDescription:
+            useCustomSound
+                ? 'Time Scheduled Notifications with sound'
+                : 'Time Scheduled Notifications',
+        useCustomSound: useCustomSound,
+        soundResource: useCustomSound ? 'notification_sound2' : null,
       );
 
       // Convert DateTime to TZDateTime
-      final tz.TZDateTime scheduledTZTime = tz.TZDateTime.from(
-        scheduledTime,
-        tz.local,
-      );
+      final tz.TZDateTime scheduledTZTime =
+          NotificationHelpers.convertToTZDateTime(scheduledTime);
 
-      // Use provided ID or generate a unique one using counter
-      final int id = notificationId ?? _notificationIdCounter++;
+      // Use provided ID or generate a unique one
+      final int id =
+          notificationId ?? NotificationHelpers.getNextNotificationId();
 
       await _notificationsPlugin.zonedSchedule(
         id,
@@ -306,77 +166,30 @@ class NotificationService {
     bool useCustomSound = false,
   }) async {
     try {
-      if (Platform.isAndroid) {
-        // Request exact alarm permission for Android 14+
-        final bool? hasPermission =
-            await _notificationsPlugin
-                .resolvePlatformSpecificImplementation<
-                  AndroidFlutterLocalNotificationsPlugin
-                >()
-                ?.requestExactAlarmsPermission();
-
-        if (hasPermission != true) {
-          debugPrint('Exact alarm permission not granted');
-          return;
-        }
-      }
-
-      // Define action buttons
-      final List<AndroidNotificationAction> actions = [
-        AndroidNotificationAction(
-          skipActionId,
-          'Skip',
-          // Comment out or remove if you don't have these icons
-          // icon: DrawableResourceAndroidBitmap('ic_skip'),
-          showsUserInterface: true,
-        ),
-        AndroidNotificationAction(
-          takenActionId,
-          'Taken',
-          // Comment out or remove if you don't have these icons
-          // icon: DrawableResourceAndroidBitmap('ic_taken'),
-          showsUserInterface: true,
-        ),
-      ];
-
-      final AndroidNotificationDetails androidNotificationDetails;
-      if (useCustomSound) {
-        androidNotificationDetails = AndroidNotificationDetails(
-          'scheduled_channel_id_sound',
-          'Scheduled Notification channel with sound',
-          channelDescription: 'Scheduled Notifications with sound',
-          importance: Importance.max,
-          priority: Priority.high,
-          sound: const RawResourceAndroidNotificationSound(
-            'notification_sound2',
-          ),
-          playSound: true,
-          actions: actions,
-        );
-      } else {
-        androidNotificationDetails = AndroidNotificationDetails(
-          'scheduled_channel_id',
-          'Scheduled Notification channel',
-          channelDescription: 'Scheduled Notifications',
-          importance: Importance.max,
-          priority: Priority.high,
-          actions: actions,
-        );
-      }
-
-      // For iOS/macOS
-      const DarwinNotificationDetails darwinNotificationDetails =
-          DarwinNotificationDetails(
-            presentAlert: true,
-            presentBadge: true,
-            presentSound: true,
-            categoryIdentifier: 'medicine_category',
+      final bool hasPermission =
+          await NotificationHelpers.requestExactAlarmPermission(
+            _notificationsPlugin,
           );
+      if (!hasPermission) {
+        debugPrint('Exact alarm permission not granted');
+        return;
+      }
 
-      NotificationDetails notificationDetails = NotificationDetails(
-        android: androidNotificationDetails,
-        iOS: darwinNotificationDetails,
-        macOS: darwinNotificationDetails,
+      final notificationDetails = NotificationHelpers.createNotificationDetails(
+        channelId:
+            useCustomSound
+                ? 'scheduled_channel_id_sound'
+                : 'scheduled_channel_id',
+        channelName:
+            useCustomSound
+                ? 'Scheduled Notification channel with sound'
+                : 'Scheduled Notification channel',
+        channelDescription:
+            useCustomSound
+                ? 'Scheduled Notifications with sound'
+                : 'Scheduled Notifications',
+        useCustomSound: useCustomSound,
+        soundResource: useCustomSound ? 'notification_sound2' : null,
       );
 
       await _notificationsPlugin.zonedSchedule(
@@ -411,7 +224,8 @@ class NotificationService {
 
         // Generate unique ID for each notification BEFORE calling scheduleNotificationAtTime
         final int uniqueId =
-            notification['notificationId'] ?? (_notificationIdCounter++);
+            notification['notificationId'] ??
+            NotificationHelpers.getNextNotificationId();
 
         await scheduleNotificationAtTime(
           title: notification['title'] ?? 'Reminder',
@@ -451,98 +265,41 @@ class NotificationService {
     int? notificationId,
   }) async {
     try {
-      if (Platform.isAndroid) {
-        // Request exact alarm permission for Android 14+
-        final bool? hasPermission =
-            await _notificationsPlugin
-                .resolvePlatformSpecificImplementation<
-                  AndroidFlutterLocalNotificationsPlugin
-                >()
-                ?.requestExactAlarmsPermission();
-
-        if (hasPermission != true) {
-          debugPrint('Exact alarm permission not granted');
-          return;
-        }
-      }
-
-      // Define action buttons
-      final List<AndroidNotificationAction> actions = [
-        AndroidNotificationAction(
-          skipActionId,
-          'Skip',
-          showsUserInterface: true,
-        ),
-        AndroidNotificationAction(
-          takenActionId,
-          'Taken',
-          showsUserInterface: true,
-        ),
-      ];
-
-      final AndroidNotificationDetails androidNotificationDetails;
-      if (useCustomSound) {
-        androidNotificationDetails = AndroidNotificationDetails(
-          'daily_channel_id_sound',
-          'Daily Notification channel with sound',
-          channelDescription: 'Daily recurring notifications with sound',
-          importance: Importance.max,
-          priority: Priority.high,
-          sound: const RawResourceAndroidNotificationSound(
-            'notification_sound2',
-          ),
-          playSound: true,
-          actions: actions,
-        );
-      } else {
-        androidNotificationDetails = AndroidNotificationDetails(
-          'daily_channel_id',
-          'Daily Notification channel',
-          channelDescription: 'Daily recurring notifications',
-          importance: Importance.max,
-          priority: Priority.high,
-          actions: actions,
-        );
-      }
-
-      // For iOS/macOS
-      const DarwinNotificationDetails darwinNotificationDetails =
-          DarwinNotificationDetails(
-            presentAlert: true,
-            presentBadge: true,
-            presentSound: true,
-            categoryIdentifier: 'medicine_category',
+      final bool hasPermission =
+          await NotificationHelpers.requestExactAlarmPermission(
+            _notificationsPlugin,
           );
+      if (!hasPermission) {
+        debugPrint('Exact alarm permission not granted');
+        return;
+      }
 
-      NotificationDetails notificationDetails = NotificationDetails(
-        android: androidNotificationDetails,
-        iOS: darwinNotificationDetails,
-        macOS: darwinNotificationDetails,
+      final notificationDetails = NotificationHelpers.createNotificationDetails(
+        channelId:
+            useCustomSound ? 'daily_channel_id_sound' : 'daily_channel_id',
+        channelName:
+            useCustomSound
+                ? 'Daily Notification channel with sound'
+                : 'Daily Notification channel',
+        channelDescription:
+            useCustomSound
+                ? 'Daily recurring notifications with sound'
+                : 'Daily recurring notifications',
+        useCustomSound: useCustomSound,
+        soundResource: useCustomSound ? 'notification_sound2' : null,
       );
 
       // Calculate next occurrence of this time
-      final now = DateTime.now();
-      DateTime scheduledTime = DateTime(
-        now.year,
-        now.month,
-        now.day,
-        time.hour,
-        time.minute,
-      );
-
-      // If time has already passed today, schedule for tomorrow
-      if (scheduledTime.isBefore(now)) {
-        scheduledTime = scheduledTime.add(const Duration(days: 1));
-      }
+      final DateTime scheduledTime =
+          NotificationHelpers.calculateNextOccurrence(time);
 
       // Convert to TZDateTime
-      final tz.TZDateTime scheduledTZTime = tz.TZDateTime.from(
-        scheduledTime,
-        tz.local,
-      );
+      final tz.TZDateTime scheduledTZTime =
+          NotificationHelpers.convertToTZDateTime(scheduledTime);
 
       // Use provided ID or generate a unique one
-      final int id = notificationId ?? _notificationIdCounter++;
+      final int id =
+          notificationId ?? NotificationHelpers.getNextNotificationId();
 
       // Schedule with daily recurrence
       await _notificationsPlugin.zonedSchedule(
