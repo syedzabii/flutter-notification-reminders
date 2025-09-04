@@ -334,62 +334,33 @@ class _NotificationDemoState extends State<NotificationDemo> {
                           const SizedBox(height: 16),
                           ElevatedButton(
                             onPressed: () async {
-                              // Schedule custom medicine reminders
-                              final now = DateTime.now();
-                              final notifications = [
+                              // Schedule daily recurring medicine reminders
+                              final dailyNotifications = [
                                 {
                                   'title': 'Morning Medicine',
                                   'body': 'Time for your morning medicine!',
-                                  'scheduledTime': DateTime(
-                                    now.year,
-                                    now.month,
-                                    now.day,
-                                    _morningTime.hour,
-                                    _morningTime.minute,
-                                  ),
+                                  'time': _morningTime,
                                   'payload': 'morning_medicine',
                                   'useCustomSound': true,
                                 },
                                 {
                                   'title': 'Afternoon Medicine',
                                   'body': 'Time for your afternoon medicine!',
-                                  'scheduledTime': DateTime(
-                                    now.year,
-                                    now.month,
-                                    now.day,
-                                    _afternoonTime.hour,
-                                    _afternoonTime.minute,
-                                  ),
+                                  'time': _afternoonTime,
                                   'payload': 'afternoon_medicine',
                                   'useCustomSound': true,
                                 },
                                 {
                                   'title': 'Evening Medicine',
                                   'body': 'Time for your evening medicine!',
-                                  'scheduledTime': DateTime(
-                                    now.year,
-                                    now.month,
-                                    now.day,
-                                    _eveningTime.hour,
-                                    _eveningTime.minute,
-                                  ),
+                                  'time': _eveningTime,
                                   'payload': 'evening_medicine',
                                   'useCustomSound': true,
                                 },
                               ];
 
-                              // Adjust times if they've already passed today
-                              for (var notification in notifications) {
-                                final scheduledTime =
-                                    notification['scheduledTime'] as DateTime;
-                                if (scheduledTime.isBefore(now)) {
-                                  notification['scheduledTime'] = scheduledTime
-                                      .add(const Duration(days: 1));
-                                }
-                              }
-
-                              await NotificationService.scheduleMultipleNotifications(
-                                notifications: notifications,
+                              await NotificationService.scheduleMultipleDailyNotifications(
+                                dailyNotifications: dailyNotifications,
                               );
 
                               ScaffoldMessenger.of(context).showSnackBar(
