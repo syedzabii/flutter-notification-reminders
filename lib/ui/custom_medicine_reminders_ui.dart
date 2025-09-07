@@ -195,21 +195,24 @@ class _CustomMedicineRemindersUIState extends State<CustomMedicineRemindersUI> {
                       'title': 'Morning Medicine',
                       'body': 'Time for your morning medicine!',
                       'time': _morningTime,
-                      'payload': 'daily_morning_medicine',
+                      'payload':
+                          'daily_morning_medicine|${_morningTime.format(context)}',
                       'useCustomSound': true,
                     },
                     {
                       'title': 'Afternoon Medicine',
                       'body': 'Time for your afternoon medicine!',
                       'time': _afternoonTime,
-                      'payload': 'daily_afternoon_medicine',
+                      'payload':
+                          'daily_afternoon_medicine|${_afternoonTime.format(context)}',
                       'useCustomSound': true,
                     },
                     {
                       'title': 'Evening Medicine',
                       'body': 'Time for your evening medicine!',
                       'time': _eveningTime,
-                      'payload': 'daily_evening_medicine',
+                      'payload':
+                          'daily_evening_medicine|${_eveningTime.format(context)}',
                       'useCustomSound': true,
                     },
                   ];

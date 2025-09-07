@@ -4,6 +4,7 @@ import 'notification_helpers.dart';
 import 'ui/show_now_ui.dart';
 import 'ui/schedule_reminders_ui.dart';
 import 'ui/custom_medicine_reminders_ui.dart';
+import 'ui/show_scheduled_notifications_ui.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 
@@ -98,6 +99,8 @@ class _NotificationDemoState extends State<NotificationDemo> {
               const ScheduleRemindersUI(),
               const SizedBox(height: 20),
               const CustomMedicineRemindersUI(),
+              const SizedBox(height: 20),
+              const ShowScheduledNotificationsUI(),
             ],
           ),
         ),

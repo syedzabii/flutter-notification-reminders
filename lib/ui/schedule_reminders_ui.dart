@@ -86,7 +86,8 @@ class _ScheduleRemindersUIState extends State<ScheduleRemindersUI> {
                 title: 'Medicine Reminder',
                 body: 'Did you take your medicine?',
                 scheduledTime: finalScheduledTime,
-                payload: 'scheduled_medicine_reminder',
+                payload:
+                    'scheduled_medicine_reminder|${_selectedTime.format(context)}',
                 useCustomSound: true,
               );
 

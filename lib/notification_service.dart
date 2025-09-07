@@ -255,6 +255,69 @@ class NotificationService {
     }
   }
 
+  /// Get all pending (scheduled) notifications
+  static Future<List<PendingNotificationRequest>>
+  getPendingNotifications() async {
+    try {
+      final List<PendingNotificationRequest> pendingNotifications =
+          await _notificationsPlugin.pendingNotificationRequests();
+      return pendingNotifications;
+    } catch (e) {
+      debugPrint('Error getting pending notifications: $e');
+      return [];
+    }
+  }
+
+  /// Get detailed notification information including scheduled times
+  static Future<List<Map<String, dynamic>>>
+  getDetailedPendingNotifications() async {
+    try {
+      final List<PendingNotificationRequest> pendingNotifications =
+          await _notificationsPlugin.pendingNotificationRequests();
+
+      // Convert to detailed format with additional information
+      return pendingNotifications.map((notification) {
+        return {
+          'id': notification.id,
+          'title': notification.title,
+          'body': notification.body,
+          'payload': notification.payload,
+          'scheduledTime': _getScheduledTimeFromPayload(notification.payload),
+        };
+      }).toList();
+    } catch (e) {
+      debugPrint('Error getting detailed pending notifications: $e');
+      return [];
+    }
+  }
+
+  /// Extract scheduled time information from payload
+  static String _getScheduledTimeFromPayload(String? payload) {
+    if (payload == null) return 'Time not available';
+
+    // Try to extract time information from payload
+    // Format: "payload_type|time_info"
+    if (payload.contains('|')) {
+      final parts = payload.split('|');
+      if (parts.length >= 2) {
+        final timeInfo = parts[1];
+        if (timeInfo.contains('daily')) {
+          return 'Daily recurring';
+        } else if (timeInfo.contains(':')) {
+          return 'Scheduled for $timeInfo';
+        }
+      }
+    }
+
+    // For daily recurring notifications
+    if (payload.contains('daily')) {
+      return 'Daily recurring';
+    }
+
+    // For one-time notifications
+    return 'One-time notification';
+  }
+
   // NEW METHOD: Schedule daily recurring notifications
   static Future<void> scheduleDailyNotification({
     required String title,
